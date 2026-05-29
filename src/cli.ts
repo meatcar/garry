@@ -1,38 +1,47 @@
 #!/usr/bin/env bun
-import { run, setup, status, teardown, update } from "./commands.ts";
+import { gstack, run, status, teardown } from "./commands.ts";
 
-const [cmd, ...rest] = process.argv.slice(2);
+const args = process.argv.slice(2);
 
-const USAGE = `garry — run gstack in an isolated sandbox
+const USAGE = `garry — run claude with gstack in an isolated sandbox
 
-Usage:
-  garry setup   [-- <gstack-setup-args>]   install gstack into the sandbox
-  garry run     [-- <claude-args>]          launch claude with gstack (sandboxed)
-  garry update  [-- <gstack-setup-args>]   pull latest gstack and re-run setup
-  garry teardown                            remove the sandbox entirely
-  garry status                             show sandbox state
+Garry is claude. Anything you pass is forwarded straight to claude, sandboxed:
+
+  garry                         launch claude (first run installs gstack)
+  garry --resume                → claude --resume
+  garry -p "..."                → claude -p "..."
+  garry mcp list                → claude mcp list
+
+Everything garry-specific lives under "garry gstack":
+
+  garry gstack [setup args...]  install / refresh gstack (forwards args, e.g. --team, --no-prefix)
+  garry gstack status           show sandbox state
+  garry gstack teardown         remove the sandbox entirely
+  garry gstack --help           show this help
+
+To update gstack, run /gstack-upgrade inside a session, or re-run "garry gstack".
 
 Environment:
   GARRY_SANDBOX_DIR   override the sandbox root directory
 `;
 
-switch (cmd) {
-  case "setup":
-    await setup(rest);
-    break;
-  case "run":
-    await run(rest);
-    break;
-  case "update":
-    await update(rest);
-    break;
-  case "teardown":
-    await teardown();
-    break;
-  case "status":
-    await status();
-    break;
-  default:
-    process.stderr.write(USAGE);
-    process.exit(cmd ? 1 : 0);
+if (args[0] === "gstack") {
+  const [sub, ...rest] = args.slice(1);
+  switch (sub) {
+    case "status":
+      await status();
+      break;
+    case "teardown":
+      await teardown();
+      break;
+    case "--help":
+    case "-h":
+      process.stdout.write(USAGE);
+      break;
+    // No subcommand, or anything else (--team, --host, ...) → gstack setup.
+    default:
+      await gstack(sub === undefined ? [] : [sub, ...rest]);
+  }
+} else {
+  await run(args);
 }

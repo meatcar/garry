@@ -40,7 +40,10 @@ async function buildSandboxEnv(): Promise<Record<string, string>> {
   return env;
 }
 
-export async function setup(passthrough: string[]): Promise<void> {
+// Install or refresh gstack inside the sandbox. Clones on first run, pulls
+// otherwise, then runs gstack's own setup — forwarding any passthrough flags
+// (e.g. --team, --no-prefix, --host). Idempotent, so it doubles as "refresh".
+export async function gstack(passthrough: string[]): Promise<void> {
   console.log(`• sandbox root: ${paths.root}`);
   await ensureSandbox();
   assertIsolation();
@@ -60,12 +63,14 @@ export async function setup(passthrough: string[]): Promise<void> {
   await $`cd ${paths.gstack} && bash ./setup ${passthrough}`.env(env);
 
   assertIsolation();
-  console.log("• setup complete");
+  console.log("• gstack ready");
 }
 
 export async function run(passthrough: string[]): Promise<void> {
   if (!existsSync(paths.gstack)) {
-    throw new Error("gstack not installed — run: garry setup");
+    console.log("• gstack not installed — running first-time setup with defaults");
+    console.log("  (for custom flags, run: garry gstack --team / --no-prefix / ...)");
+    await gstack([]);
   }
 
   await ensureSandbox();
@@ -81,22 +86,6 @@ export async function run(passthrough: string[]): Promise<void> {
     stderr: "inherit",
   });
   process.exitCode = await proc.exited;
-}
-
-export async function update(passthrough: string[]): Promise<void> {
-  if (!existsSync(`${paths.gstack}/.git`)) {
-    throw new Error("gstack not installed — run: garry setup");
-  }
-
-  console.log("• updating gstack");
-  await $`git -C ${paths.gstack} pull --ff-only`;
-
-  const env = await buildSandboxEnv();
-  console.log("• re-running setup");
-  await $`cd ${paths.gstack} && bash ./setup ${passthrough}`.env(env);
-
-  assertIsolation();
-  console.log("• update complete");
 }
 
 export async function teardown(): Promise<void> {

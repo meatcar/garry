@@ -17,7 +17,7 @@ gstack installs itself as a Claude Code skill and modifies your `~/.claude` dire
 **Nix:**
 
 ```sh
-nix run github:meatcar/garry -- status
+nix run github:meatcar/garry -- gstack status
 ```
 
 **Homebrew** (macOS / Linux):
@@ -58,27 +58,33 @@ bunx garry <command>
 
 ## Usage
 
-```
-garry setup     install gstack into the sandbox
-garry run       launch claude with gstack (sandboxed)
-garry update    pull latest gstack and re-run setup
-garry teardown  remove the sandbox entirely
-garry status    show sandbox state
-```
-
-First time:
+**garry is claude.** Whatever you pass is forwarded straight to `claude`, running in the sandbox — and the first run installs gstack for you automatically:
 
 ```sh
-garry setup
-garry run
+garry                # launch claude (installs gstack on first run)
+garry --resume       # → claude --resume
+garry -p "fix tests" # → claude -p "fix tests"
+garry mcp list       # → claude mcp list
 ```
 
-Pass arguments through to gstack setup or claude:
+Everything garry-specific lives under `garry gstack`:
+
+```
+garry gstack [setup args...]  install / refresh gstack (forwards flags, e.g. --team, --no-prefix)
+garry gstack status           show sandbox state
+garry gstack teardown         remove the sandbox entirely
+garry gstack --help           show help
+```
+
+First-run setup uses gstack's defaults. To install with custom flags, run it once explicitly before your first `garry`:
 
 ```sh
-garry setup -- --some-gstack-flag
-garry run -- --resume
+garry gstack --team --no-prefix
 ```
+
+### Updating gstack
+
+gstack updates itself from inside a session — just run `/gstack-upgrade` in claude (team-mode installs also auto-update hourly). To refresh from outside, re-run `garry gstack`, which pulls the latest and re-runs setup.
 
 ## How it works
 
@@ -88,7 +94,7 @@ garry creates a sandbox directory (default: `~/Library/Application Support/garry
 - Your credentials and settings are copied in at runtime so claude can authenticate
 - Tool caches (`.bun`, `.npm`, `.cache`, etc.) are symlinked from your real home to avoid redundant downloads
 
-On each `garry run`, credentials are synced from your real `~/.claude` so you stay authenticated without sharing config.
+On each launch, credentials are synced from your real `~/.claude` so you stay authenticated without sharing config.
 
 ## Configuration
 
