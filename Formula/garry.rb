@@ -6,7 +6,7 @@ class Garry < Formula
   license "MIT"
   head "https://github.com/meatcar/garry.git", branch: "main"
 
-  depends_on "bun"
+  depends_on "oven-sh/bun/bun"
 
   def install
     libexec.install "src"

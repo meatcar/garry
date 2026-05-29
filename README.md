@@ -23,6 +23,7 @@ nix run github:meatcar/garry -- status
 **Homebrew** (macOS / Linux):
 
 ```sh
+brew tap oven-sh/bun
 brew tap meatcar/garry https://github.com/meatcar/garry
 brew install garry
 ```
