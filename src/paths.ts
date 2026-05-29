@@ -1,0 +1,63 @@
+import { accessSync, chmodSync, constants, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, userInfo } from "node:os";
+import { join } from "node:path";
+
+const xdgData = process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share");
+const EXEC_MODE = 0o755;
+
+function isExecutable(dir: string): boolean {
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    return false;
+  }
+  const probe = join(dir, ".garry-exec-probe");
+  try {
+    writeFileSync(probe, "#!/bin/sh\nexit 0\n");
+    chmodSync(probe, EXEC_MODE);
+    accessSync(probe, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try {
+      rmSync(probe, { force: true });
+    } catch {
+      /* Best effort. */
+    }
+  }
+}
+
+function pickRoot(): string {
+  if (process.env.GARRY_SANDBOX_DIR) {
+    return process.env.GARRY_SANDBOX_DIR;
+  }
+
+  const { uid } = userInfo();
+  const [defaultRoot, ...fallbacks] = [
+    join(xdgData, "garry-sandbox"),
+    join(homedir(), ".garry-sandbox"),
+    `/var/tmp/garry-sandbox-${uid}`,
+    `/tmp/garry-sandbox-${uid}`,
+  ];
+
+  for (const candidate of [defaultRoot, ...fallbacks]) {
+    if (candidate && isExecutable(candidate)) {
+      return candidate;
+    }
+  }
+  return defaultRoot ?? `/tmp/garry-sandbox-${uid}`;
+}
+
+const root = pickRoot();
+
+export const paths = {
+  root,
+  home: join(root, "home"),
+  claude: join(root, "home", ".claude"),
+  skills: join(root, "home", ".claude", "skills"),
+  gstack: join(root, "home", ".claude", "skills", "gstack"),
+  realClaude: join(homedir(), ".claude"),
+};
+
+export const GSTACK_REPO = "https://github.com/garrytan/gstack.git";

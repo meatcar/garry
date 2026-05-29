@@ -1,0 +1,18 @@
+{
+  "name": "garry",
+  "version": "0.1.0",
+  "description": "Run gstack (garrytan/gstack) in full isolation from your local Claude Code config",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meatcar/garry.git"
+  },
+  "keywords": ["claude", "claude-code", "gstack", "sandbox", "isolation"],
+  "bin": {
+    "garry": "./src/cli.ts"
+  },
+  "type": "module",
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
