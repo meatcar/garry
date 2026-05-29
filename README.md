@@ -102,7 +102,9 @@ On each `garry run`, credentials are synced from your real `~/.claude` so you st
 
 On NixOS, garry uses the Playwright browser bundle from nixpkgs (`playwright-driver.browsers`) instead of letting gstack download its own Chromium. These browsers are already patched for NixOS, so there's nothing to rebuild.
 
-To keep things working, garry pins gstack's `playwright` dependency to the version packaged in nixpkgs — the browser revisions are tied to the Playwright version, so the two must match. It also sets `PLAYWRIGHT_BROWSERS_PATH` to the nix bundle and skips the download / host-requirement checks. Set `PLAYWRIGHT_BROWSERS_PATH` yourself to override the bundle garry picks.
+Browser revisions are tied to the Playwright version, so garry pins a specific nixpkgs revision whose `playwright-driver` matches the Playwright version gstack locks — gstack itself is left untouched. It builds that pinned bundle (independent of your channel), sets `PLAYWRIGHT_BROWSERS_PATH` to it, and skips the download / host-requirement checks. Set `PLAYWRIGHT_BROWSERS_PATH` yourself to override the bundle garry picks.
+
+When gstack bumps Playwright, the pin needs refreshing (`NIXPKGS_PIN` in `src/nixos.ts`). garry detects this drift after setup and prints the exact fix.
 
 ## License
 
