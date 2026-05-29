@@ -96,10 +96,13 @@ On each `garry run`, credentials are synced from your real `~/.claude` so you st
 |---|---|---|
 | `GARRY_SANDBOX_DIR` | `~/Library/Application Support/garry-sandbox` (macOS), `~/.local/share/garry-sandbox` (Linux) | Override the sandbox root |
 | `XDG_DATA_HOME` | unset | If set, the sandbox root is `$XDG_DATA_HOME/garry-sandbox` on all platforms |
+| `PLAYWRIGHT_BROWSERS_PATH` | `<sandbox>/playwright-browsers`, or the nixpkgs bundle on NixOS | Override where Playwright looks for browsers |
 
 ## NixOS
 
-On NixOS, garry automatically builds the Chromium runtime dependencies via `nix-build` so gstack's Playwright integration works out of the box.
+On NixOS, garry uses the Playwright browser bundle from nixpkgs (`playwright-driver.browsers`) instead of letting gstack download its own Chromium. These browsers are already patched for NixOS, so there's nothing to rebuild.
+
+To keep things working, garry pins gstack's `playwright` dependency to the version packaged in nixpkgs — the browser revisions are tied to the Playwright version, so the two must match. It also sets `PLAYWRIGHT_BROWSERS_PATH` to the nix bundle and skips the download / host-requirement checks. Set `PLAYWRIGHT_BROWSERS_PATH` yourself to override the bundle garry picks.
 
 ## License
 

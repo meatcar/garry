@@ -3,7 +3,13 @@ import { mkdir, rm, rmdir } from "node:fs/promises";
 
 import { $ } from "bun";
 
-import { buildChromiumDeps, isNixOS } from "./nixos.ts";
+import {
+  type NixPlaywright,
+  isNixOS,
+  pinPlaywrightVersion,
+  playwrightEnv,
+  resolveNixPlaywright,
+} from "./nixos.ts";
 import { GSTACK_REPO, paths } from "./paths.ts";
 import { assertIsolation, ensureSandbox, syncConfig } from "./sandbox.ts";
 
@@ -17,27 +23,26 @@ function inheritedEnv(): Record<string, string> {
   return out;
 }
 
-async function buildSandboxEnv(): Promise<Record<string, string>> {
-  const env: Record<string, string> = {
+// On NixOS, resolve the pre-patched Playwright browser bundle from nixpkgs so
+// gstack doesn't have to download Chromium or rebuild its runtime deps.
+async function nixPlaywright(): Promise<NixPlaywright | undefined> {
+  if (!isNixOS()) {
+    return undefined;
+  }
+  console.log("• NixOS detected — using nixpkgs Playwright browsers (no Chromium download)");
+  return resolveNixPlaywright();
+}
+
+function buildSandboxEnv(nix: NixPlaywright | undefined): Record<string, string> {
+  return {
     ...inheritedEnv(),
     HOME: paths.home,
-    PLAYWRIGHT_BROWSERS_PATH:
-      process.env.PLAYWRIGHT_BROWSERS_PATH ?? `${paths.root}/playwright-browsers`,
+    ...playwrightEnv(
+      nix,
+      process.env.PLAYWRIGHT_BROWSERS_PATH,
+      `${paths.root}/playwright-browsers`,
+    ),
   };
-
-  if (isNixOS()) {
-    console.log("• NixOS detected — building chromium runtime deps via nix-build");
-    const depsPath = await buildChromiumDeps();
-    const libPath = `${depsPath}/lib`;
-    env.NIX_LD_LIBRARY_PATH = process.env.NIX_LD_LIBRARY_PATH
-      ? `${libPath}:${process.env.NIX_LD_LIBRARY_PATH}`
-      : libPath;
-    env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
-      ? `${libPath}:${process.env.LD_LIBRARY_PATH}`
-      : libPath;
-  }
-
-  return env;
 }
 
 export async function setup(passthrough: string[]): Promise<void> {
@@ -55,7 +60,12 @@ export async function setup(passthrough: string[]): Promise<void> {
     await $`git clone --single-branch --depth 1 ${GSTACK_REPO} ${paths.gstack}`;
   }
 
-  const env = await buildSandboxEnv();
+  const nix = await nixPlaywright();
+  if (nix && pinPlaywrightVersion(paths.gstack, nix.version)) {
+    console.log(`• pinned gstack playwright to ${nix.version} (matches nixpkgs)`);
+  }
+
+  const env = buildSandboxEnv(nix);
   console.log(`• running gstack setup (HOME=${paths.home})`);
   await $`cd ${paths.gstack} && bash ./setup ${passthrough}`.env(env);
 
@@ -72,7 +82,7 @@ export async function run(passthrough: string[]): Promise<void> {
   assertIsolation();
   await syncConfig();
 
-  const env = await buildSandboxEnv();
+  const env = buildSandboxEnv(await nixPlaywright());
   console.log("• launching claude with gstack (sandboxed)");
   const proc = Bun.spawn(["claude", ...passthrough], {
     env,
@@ -91,7 +101,12 @@ export async function update(passthrough: string[]): Promise<void> {
   console.log("• updating gstack");
   await $`git -C ${paths.gstack} pull --ff-only`;
 
-  const env = await buildSandboxEnv();
+  const nix = await nixPlaywright();
+  if (nix && pinPlaywrightVersion(paths.gstack, nix.version)) {
+    console.log(`• pinned gstack playwright to ${nix.version} (matches nixpkgs)`);
+  }
+
+  const env = buildSandboxEnv(nix);
   console.log("• re-running setup");
   await $`cd ${paths.gstack} && bash ./setup ${passthrough}`.env(env);
 
