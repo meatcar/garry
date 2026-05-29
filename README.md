@@ -17,7 +17,7 @@ gstack installs itself as a Claude Code skill and modifies your `~/.claude` dire
 **Homebrew** (macOS / Linux):
 
 ```sh
-brew tap meatcar/garry
+brew tap meatcar/garry https://github.com/meatcar/garry
 brew install garry
 ```
 
