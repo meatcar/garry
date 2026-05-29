@@ -14,6 +14,12 @@ gstack installs itself as a Claude Code skill and modifies your `~/.claude` dire
 
 ## Install
 
+**Nix:**
+
+```sh
+nix run github:meatcar/garry -- status
+```
+
 **Homebrew** (macOS / Linux):
 
 ```sh
