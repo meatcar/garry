@@ -8,17 +8,42 @@ gstack installs itself as a Claude Code skill and modifies your `~/.claude` dire
 
 ## Requirements
 
-- [Bun](https://bun.sh) ≥ 1.0
+- [Bun](https://bun.sh) ≥ 1.0 (except Homebrew, which manages this automatically)
 - [Claude Code](https://claude.ai/code) CLI (`claude`) on your `PATH`
 - Git
 
 ## Install
 
+**Homebrew** (macOS / Linux):
+
 ```sh
-bun install -g garry
+brew tap meatcar/garry
+brew install garry
 ```
 
-Or run without installing:
+Or install the latest from `main`:
+
+```sh
+brew install --HEAD meatcar/garry/garry
+```
+
+**npm / bun registry:**
+
+```sh
+bun install -g garry
+# or
+npm install -g garry
+```
+
+**Git (from source):**
+
+```sh
+git clone https://github.com/meatcar/garry.git
+cd garry
+bun link
+```
+
+**One-off (no install):**
 
 ```sh
 bunx garry <command>
