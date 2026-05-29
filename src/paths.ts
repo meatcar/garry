@@ -2,7 +2,15 @@ import { accessSync, chmodSync, constants, mkdirSync, rmSync, writeFileSync } fr
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 
-const xdgData = process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share");
+const isMacOS = process.platform === "darwin";
+
+// Where per-user app data lives by default. Honor XDG_DATA_HOME everywhere; otherwise
+// use the platform-idiomatic location: ~/Library/Application Support on macOS, ~/.local/share elsewhere.
+const xdgData =
+  process.env.XDG_DATA_HOME ??
+  (isMacOS
+    ? join(homedir(), "Library", "Application Support")
+    : join(homedir(), ".local", "share"));
 const EXEC_MODE = 0o755;
 
 function isExecutable(dir: string): boolean {
