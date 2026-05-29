@@ -24,14 +24,14 @@ nix run github:meatcar/garry -- status
 
 ```sh
 brew tap oven-sh/bun
-brew tap meatcar/garry https://github.com/meatcar/garry
-brew install garry
+brew tap meatcar/tap
+brew install meatcar/tap/garry
 ```
 
 Or install the latest from `main`:
 
 ```sh
-brew install --HEAD meatcar/garry/garry
+brew install --HEAD meatcar/tap/garry
 ```
 
 **npm / bun registry:**
