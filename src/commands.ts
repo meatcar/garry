@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, rm, rmdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 
 import { $ } from "bun";
 
@@ -95,9 +95,9 @@ export async function teardown(): Promise<void> {
   }
 
   console.log(`• removing sandbox: ${paths.root}`);
-  await rm(paths.claude, { recursive: true, force: true });
-  await rm(paths.home, { recursive: true, force: true });
-  await rmdir(paths.root).catch(() => undefined);
+  // Everything (home, .claude, playwright-browsers, the nix deps cache) lives
+  // under root, so a single recursive remove clears the sandbox entirely.
+  await rm(paths.root, { recursive: true, force: true });
   console.log("• teardown complete");
 }
 
