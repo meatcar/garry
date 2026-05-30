@@ -5,18 +5,7 @@ import { $ } from "bun";
 
 import { paths } from "./paths.ts";
 
-const CHROMIUM_DEPS_EXPR = `with import <nixpkgs> {}; symlinkJoin {
-  name = "garry-chromium-deps";
-  paths = with pkgs; [
-    glib.out nss nspr atk at-spi2-atk cups.lib dbus.lib libdrm
-    gtk3 pango.out cairo.out libxkbcommon mesa expat libxcb
-    alsa-lib.out at-spi2-core libxshmfence
-    xorg.libX11 xorg.libXcomposite xorg.libXdamage xorg.libXext
-    xorg.libXfixes xorg.libXrandr xorg.libxcb gdk-pixbuf
-  ];
-}`;
-
-const CHROMIUM_DEPS_CACHE = join(paths.root, "chromium-deps-path");
+const BROWSERS_CACHE = join(paths.root, "playwright-browsers-path");
 
 let nixOSCache: boolean | undefined;
 
@@ -28,48 +17,57 @@ export function isNixOS(): boolean {
   return nixOSCache;
 }
 
-let depsPathCache: string | undefined;
+// nixpkgs source pinned to gstack's Playwright version, injected by the flake
+// wrapper from the `nixpkgs-playwright` input (see flake.nix).
+function nixpkgsPath(): string {
+  const path = process.env.GARRY_PLAYWRIGHT_NIXPKGS;
+  if (!path?.startsWith("/nix/store/")) {
+    throw new Error("GARRY_PLAYWRIGHT_NIXPKGS is unset — install garry via its Nix flake on NixOS.");
+  }
+  return path;
+}
 
-export async function buildChromiumDeps(): Promise<string> {
-  // nix-build re-evaluates nixpkgs on every call (seconds). The result is a
-  // deterministic store path for a given channel, so cache it — in-process and
-  // on disk — and skip the rebuild while the cached path still exists.
-  if (depsPathCache) {
-    return depsPathCache;
+let browsersPathCache: string | undefined;
+
+// gstack drives a headless Chromium daemon, so the chromium-only bundle suffices.
+export async function buildPlaywrightBrowsers(): Promise<string> {
+  if (browsersPathCache) {
+    return browsersPathCache;
   }
 
-  const cached = readCachedDepsPath();
+  const cached = readCachedBrowsersPath();
   if (cached) {
-    return (depsPathCache = cached);
+    return (browsersPathCache = cached);
   }
 
-  const result = await $`nix-build --no-out-link -E ${CHROMIUM_DEPS_EXPR}`.quiet();
+  const expr = `(import ${nixpkgsPath()} { }).playwright-driver.browsers-chromium`;
+  const result = await $`nix-build --no-out-link -E ${expr}`.quiet();
   const path = result.stdout.toString().trim().split("\n").pop() ?? "";
   if (!path.startsWith("/nix/store/")) {
     throw new Error(`nix-build did not return a store path: ${path}`);
   }
-  cacheDepsPath(path);
-  return (depsPathCache = path);
+  cacheBrowsersPath(path);
+  return (browsersPathCache = path);
 }
 
-function readCachedDepsPath(): string | undefined {
+// Cache the store path in-process and on disk; a stale entry (rev bumped, path
+// GC'd) fails the existsSync check and falls back to a fresh nix-build.
+function readCachedBrowsersPath(): string | undefined {
   try {
-    const path = readFileSync(CHROMIUM_DEPS_CACHE, "utf8").trim();
-    // A stale cache (channel bumped, path garbage-collected) fails this check
-    // and falls back to a fresh nix-build.
+    const path = readFileSync(BROWSERS_CACHE, "utf8").trim();
     if (path.startsWith("/nix/store/") && existsSync(path)) {
       return path;
     }
   } catch {
-    // No cache yet — fall through to build.
+    // No cache yet.
   }
   return undefined;
 }
 
-function cacheDepsPath(path: string): void {
+function cacheBrowsersPath(path: string): void {
   try {
-    writeFileSync(CHROMIUM_DEPS_CACHE, `${path}\n`);
+    writeFileSync(BROWSERS_CACHE, `${path}\n`);
   } catch {
-    // Best effort — a cache-write failure must never break the build.
+    // Best effort.
   }
 }
