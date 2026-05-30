@@ -1,11 +1,18 @@
 #!/usr/bin/env bun
 // Keep NIXPKGS_PIN in src/nixos.ts matched to the Playwright version gstack
-// locks. Browser revisions are tied to the Playwright version, so when gstack
+// uses. Browser revisions are tied to the Playwright version, so when gstack
 // bumps Playwright the pinned nixpkgs revision (and its hash) must follow.
 //
-// This is normally run by CI on a schedule, but you can run it by hand too:
-//   bun run scripts/update-nixpkgs-pin.ts            # match gstack's current lock
+// Renovate watches gstack's package.json (see renovate.json) and opens a PR
+// bumping `playwrightVersion`; the complete-nixpkgs-pin workflow then runs this
+// to fill in the matching rev + hash. You can also run it by hand:
+//   bun run scripts/update-nixpkgs-pin.ts            # match gstack's package.json
 //   bun run scripts/update-nixpkgs-pin.ts 1.58.2     # force a specific version
+//
+// It reads gstack's package.json (not bun.lock) so it stays consistent with
+// Renovate's datasource — bun.lock is JSONC and Renovate can't parse it. The
+// runtime drift check in commands.ts catches the rare case where gstack's
+// resolved lock differs from its declared range.
 //
 // Requires Nix on PATH (for nix-prefetch-url / nix-instantiate). Set GITHUB_TOKEN
 // to avoid GitHub API rate limits.
@@ -14,9 +21,9 @@ import { fileURLToPath } from "node:url";
 
 import { $ } from "bun";
 
-// Mirrors GSTACK_REPO in src/paths.ts (imported as a literal to avoid that
+// gstack repo (mirrors GSTACK_REPO in src/paths.ts, inlined to avoid that
 // module's import-time filesystem probing).
-const GSTACK_LOCK_URL = "https://raw.githubusercontent.com/garrytan/gstack/main/bun.lock";
+const GSTACK_PKG_URL = "https://raw.githubusercontent.com/garrytan/gstack/main/package.json";
 const DRIVER_NIX_PATH = "pkgs/development/web/playwright/driver.nix";
 const NIXOS_TS = fileURLToPath(new URL("../src/nixos.ts", import.meta.url));
 
@@ -26,11 +33,14 @@ export interface Pin {
   playwrightVersion: string;
 }
 
-// Pull the exact (locked) playwright version out of gstack's bun.lock.
-export function parseGstackPlaywrightVersion(lockText: string): string {
-  const version = lockText.match(/"playwright":\s*\["playwright@(\d+\.\d+\.\d+)"/)?.[1];
+// Pull the declared playwright version out of gstack's package.json, stripping
+// any range operator (e.g. "^1.58.2" -> "1.58.2"). This matches what Renovate's
+// custom datasource extracts, keeping the two from fighting over the file.
+export function parseGstackPlaywrightVersion(pkgJson: string): string {
+  const pkg = JSON.parse(pkgJson) as { dependencies?: Record<string, string> };
+  const version = pkg.dependencies?.playwright?.match(/(\d+\.\d+\.\d+)/)?.[1];
   if (!version) {
-    throw new Error("could not find a locked playwright version in gstack's bun.lock");
+    throw new Error("could not find a playwright dependency in gstack's package.json");
   }
   return version;
 }
@@ -143,18 +153,18 @@ async function verifyPin(pin: Pin): Promise<void> {
   }
 }
 
+function pinsEqual(a: Pin, b: Pin): boolean {
+  return a.rev === b.rev && a.sha256 === b.sha256 && a.playwrightVersion === b.playwrightVersion;
+}
+
 async function main(): Promise<void> {
   const forced = process.argv[2];
   const version =
-    forced ?? parseGstackPlaywrightVersion(await (await fetch(GSTACK_LOCK_URL)).text());
+    forced ?? parseGstackPlaywrightVersion(await (await fetch(GSTACK_PKG_URL)).text());
   console.log(`• gstack Playwright version: ${version}`);
 
   const fileText = readFileSync(NIXOS_TS, "utf8");
   const current = readCurrentPin(fileText);
-  if (current.playwrightVersion === version) {
-    console.log(`• pin already targets ${version} (rev ${current.rev.slice(0, 12)}) — up to date`);
-    return;
-  }
 
   console.log(`• searching nixpkgs for playwright-driver ${version}…`);
   const rev = await findNixpkgsRev(version);
@@ -166,8 +176,15 @@ async function main(): Promise<void> {
   console.log("• verifying pin evaluates to the expected version…");
   await verifyPin(pin);
 
+  // Compare every field: Renovate bumps `playwrightVersion` on its own but
+  // leaves rev/sha256 stale, so a version-only check would wrongly no-op.
+  if (pinsEqual(current, pin)) {
+    console.log(`• pin already correct for ${version} (rev ${rev.slice(0, 12)}) — up to date`);
+    return;
+  }
+
   writeFileSync(NIXOS_TS, applyPin(fileText, pin));
-  console.log(`• updated NIXPKGS_PIN: ${current.playwrightVersion} → ${version}`);
+  console.log(`• updated NIXPKGS_PIN → playwright ${version}`);
   console.log(`    rev=${rev}`);
   console.log(`    sha256=${sha256}`);
 }

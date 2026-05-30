@@ -104,7 +104,7 @@ On NixOS, garry uses the Playwright browser bundle from nixpkgs (`playwright-dri
 
 Browser revisions are tied to the Playwright version, so garry pins a specific nixpkgs revision whose `playwright-driver` matches the Playwright version gstack locks — gstack itself is left untouched. It builds that pinned bundle (independent of your channel), sets `PLAYWRIGHT_BROWSERS_PATH` to it, and skips the download / host-requirement checks. Set `PLAYWRIGHT_BROWSERS_PATH` yourself to override the bundle garry picks.
 
-When gstack bumps Playwright, the pin (`NIXPKGS_PIN` in `src/nixos.ts`) needs refreshing. A scheduled CI workflow does this automatically — it reads gstack's locked Playwright version, finds the matching nixpkgs revision, and opens a PR. You can also run it by hand with `bun run update-pin` (requires Nix). As a backstop, garry detects drift after setup and prints the exact fix.
+When gstack bumps Playwright, the pin (`NIXPKGS_PIN` in `src/nixos.ts`) needs refreshing. This is automated: [Renovate](https://docs.renovatebot.com) watches gstack's `package.json` and opens a PR bumping `playwrightVersion`, and the `complete-nixpkgs-pin` workflow fills in the matching nixpkgs revision and hash on that PR (the version→commit lookup and NAR hash are things Renovate can't compute itself). You can also run it by hand with `bun run update-pin` (requires Nix). As a backstop, garry detects drift after setup and prints the exact fix.
 
 ## License
 

@@ -9,21 +9,22 @@ import {
   readCurrentPin,
 } from "./update-nixpkgs-pin.ts";
 
-const SAMPLE_LOCK = `{
-  "lockfileVersion": 1,
-  "packages": {
-    "playwright": ["playwright@1.58.2", "", { "dependencies": { "playwright-core": "1.58.2" } }, "sha512-xxx"],
-    "playwright-core": ["playwright-core@1.58.2", "", {}, "sha512-yyy"],
-  }
-}`;
+const SAMPLE_PKG = JSON.stringify({
+  name: "gstack",
+  dependencies: { playwright: "^1.58.2", "puppeteer-core": "^24.40.0" },
+});
 
 describe("parseGstackPlaywrightVersion", () => {
-  test("extracts the locked playwright version", () => {
-    expect(parseGstackPlaywrightVersion(SAMPLE_LOCK)).toBe("1.58.2");
+  test("extracts the playwright version, stripping the range operator", () => {
+    expect(parseGstackPlaywrightVersion(SAMPLE_PKG)).toBe("1.58.2");
   });
 
-  test("throws when no playwright entry is present", () => {
-    expect(() => parseGstackPlaywrightVersion('{"packages":{}}')).toThrow();
+  test("handles a bare (operator-less) version", () => {
+    expect(parseGstackPlaywrightVersion('{"dependencies":{"playwright":"1.59.1"}}')).toBe("1.59.1");
+  });
+
+  test("throws when no playwright dependency is present", () => {
+    expect(() => parseGstackPlaywrightVersion('{"dependencies":{}}')).toThrow();
   });
 });
 

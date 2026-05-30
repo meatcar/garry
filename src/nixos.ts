@@ -3,11 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { $ } from "bun";
 
 // Pinned nixpkgs revision whose `playwright-driver` matches the Playwright
-// version gstack locks (see gstack's bun.lock). The browser revisions are tied
-// to the Playwright version, so this pin must track gstack's locked version.
+// version gstack uses. The browser revisions are tied to the Playwright
+// version, so this pin must track gstack's version.
 //
-// Refreshed automatically by `bun run update-pin` (scripts/update-nixpkgs-pin.ts),
-// which CI runs on a schedule and opens a PR when gstack bumps Playwright.
+// Kept current automatically: Renovate (renovate.json) watches gstack's
+// package.json and bumps `playwrightVersion` here; the complete-nixpkgs-pin
+// workflow then fills in the matching `rev` + `sha256`. To do it by hand, run
+// `bun run update-pin` (requires Nix).
 export const NIXPKGS_PIN = {
   rev: "0f2be1f70b1fb91a99fe21b3820a39bbf5c11e16",
   sha256: "119g85pw1b8cn2gxldg35vp0r1mx9ynxs1gl9rsydmyw8i8kr1x0",

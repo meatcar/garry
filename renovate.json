@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track gstack's Playwright version in the NixOS browser pin",
+      "managerFilePatterns": ["src/nixos.ts"],
+      "matchStrings": ["playwrightVersion:\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "depNameTemplate": "playwright",
+      "datasourceTemplate": "custom.gstack-playwright"
+    }
+  ],
+  "customDatasources": {
+    "gstack-playwright": {
+      "description": "The Playwright version declared in gstack's package.json (range operator stripped)",
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/garrytan/gstack/main/package.json",
+      "format": "json",
+      "transformTemplates": [
+        "{ \"releases\": [ { \"version\": $replace(dependencies.playwright, /[^0-9.]/, \"\") } ] }"
+      ]
+    }
+  },
+  "packageRules": [
+    {
+      "description": "gstack Playwright bumps: the complete-nixpkgs-pin workflow fills in the matching nixpkgs rev + hash on the PR",
+      "matchDatasources": ["custom.gstack-playwright"],
+      "commitMessageTopic": "gstack Playwright pin",
+      "addLabels": ["nixpkgs-pin"]
+    }
+  ]
+}

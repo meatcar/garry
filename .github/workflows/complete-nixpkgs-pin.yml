@@ -1,0 +1,56 @@
+name: Complete nixpkgs Playwright pin
+
+# Renovate (see renovate.json) watches gstack's package.json and opens a PR that
+# bumps only `playwrightVersion` in src/nixos.ts. Renovate can't reverse-map that
+# version to a nixpkgs commit or compute the fetchTarball NAR hash, so this
+# workflow finishes the job: it resolves the matching nixpkgs rev + sha256 and
+# commits them onto the same PR.
+#
+# Requires Renovate to push via an app/PAT (e.g. the Mend Renovate app) so the
+# PR event actually fires — branch pushes made with the default GITHUB_TOKEN do
+# not trigger workflows.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - src/nixos.ts
+
+permissions:
+  contents: write
+
+jobs:
+  complete-pin:
+    # Only react to Renovate's branches, and never to forks (we push back).
+    if: startsWith(github.head_ref, 'renovate/') && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Resolve nixpkgs rev + hash for gstack's Playwright
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run update-pin
+
+      - name: Verify and commit any change
+        run: |
+          bun run check
+          bun test
+          if [ -n "$(git status --porcelain src/nixos.ts)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: resolve nixpkgs rev + hash for new Playwright pin" -- src/nixos.ts
+            git push origin HEAD:"${{ github.head_ref }}"
+          else
+            echo "Pin already complete; nothing to commit."
+          fi
