@@ -6,9 +6,8 @@ import { $ } from "bun";
 // version gstack locks (see gstack's bun.lock). The browser revisions are tied
 // to the Playwright version, so this pin must track gstack's locked version.
 //
-// To refresh when gstack bumps Playwright, find a nixpkgs commit where
-// pkgs/development/web/playwright/driver.nix has the matching version and run:
-//   nix-prefetch-url --unpack https://github.com/NixOS/nixpkgs/archive/<rev>.tar.gz
+// Refreshed automatically by `bun run update-pin` (scripts/update-nixpkgs-pin.ts),
+// which CI runs on a schedule and opens a PR when gstack bumps Playwright.
 export const NIXPKGS_PIN = {
   rev: "0f2be1f70b1fb91a99fe21b3820a39bbf5c11e16",
   sha256: "119g85pw1b8cn2gxldg35vp0r1mx9ynxs1gl9rsydmyw8i8kr1x0",

@@ -1,0 +1,53 @@
+name: Update nixpkgs Playwright pin
+
+# gstack is an external repo, so we can't get a webhook when it bumps Playwright.
+# Instead we poll on a schedule: read gstack's locked Playwright version, find the
+# matching nixpkgs revision, recompute its hash, and open a PR if the pin changed.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Bump nixpkgs pin to match gstack's Playwright
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run update-pin
+
+      - name: Typecheck + test
+        run: |
+          bun run check
+          bun test
+
+      - name: Open PR if the pin changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: ci/bump-nixpkgs-playwright-pin
+          delete-branch: true
+          commit-message: "chore: bump nixpkgs pin to match gstack Playwright"
+          title: "chore: bump nixpkgs Playwright pin"
+          body: |
+            gstack's locked Playwright version changed, so the pinned nixpkgs
+            revision (which provides the NixOS browser bundle) was updated to
+            match. The new pin was verified to evaluate to the expected
+            `playwright-driver` version.
+
+            Automated by `.github/workflows/update-nixpkgs-pin.yml`.

@@ -13,7 +13,9 @@
   },
   "type": "module",
   "scripts": {
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "update-pin": "bun run scripts/update-nixpkgs-pin.ts"
   },
   "engines": {
     "bun": ">=1.0.0"
