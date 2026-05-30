@@ -105,7 +105,9 @@ On each launch, credentials are synced from your real `~/.claude` so you stay au
 
 ## NixOS
 
-On NixOS, garry automatically builds the Chromium runtime dependencies via `nix-build` so gstack's Playwright integration works out of the box.
+On NixOS, garry skips Playwright's prebuilt Chromium (which can't run against NixOS' non-FHS libraries) and instead points Playwright at the Chromium that nixpkgs builds for NixOS, via `nix-build`. Playwright resolves browsers by a revision tied to its exact version, so garry pins a nixpkgs revision whose `playwright-driver` matches the Playwright version gstack installs — no per-launch Chromium download or library shimming required.
+
+The matching nixpkgs is pinned as the `nixpkgs-playwright` flake input in [`flake.nix`](flake.nix). If gstack bumps its Playwright version, repoint that input at a nixpkgs commit whose `playwright-driver` matches the new version (e.g. via [nixhub](https://www.nixhub.io/packages/playwright-driver)) and run `nix flake lock`. Set `PLAYWRIGHT_BROWSERS_PATH` yourself to override the pinned browsers entirely.
 
 ## License
 

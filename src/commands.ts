@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 
 import { $ } from "bun";
 
-import { buildChromiumDeps, isNixOS } from "./nixos.ts";
+import { buildPlaywrightBrowsers, isNixOS } from "./nixos.ts";
 import { GSTACK_REPO, paths } from "./paths.ts";
 import { assertIsolation, ensureSandbox, syncConfig } from "./sandbox.ts";
 
@@ -21,20 +21,22 @@ async function buildSandboxEnv(): Promise<Record<string, string>> {
   const env: Record<string, string> = {
     ...inheritedEnv(),
     HOME: paths.home,
-    PLAYWRIGHT_BROWSERS_PATH:
-      process.env.PLAYWRIGHT_BROWSERS_PATH ?? `${paths.root}/playwright-browsers`,
   };
 
   if (isNixOS()) {
-    console.log("• NixOS detected — building chromium runtime deps via nix-build");
-    const depsPath = await buildChromiumDeps();
-    const libPath = `${depsPath}/lib`;
-    env.NIX_LD_LIBRARY_PATH = process.env.NIX_LD_LIBRARY_PATH
-      ? `${libPath}:${process.env.NIX_LD_LIBRARY_PATH}`
-      : libPath;
-    env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
-      ? `${libPath}:${process.env.LD_LIBRARY_PATH}`
-      : libPath;
+    // Playwright's prebuilt Chromium can't run against NixOS' non-FHS libraries,
+    // so use the Chromium nixpkgs builds for NixOS instead of downloading + lib-shimming.
+    if (process.env.PLAYWRIGHT_BROWSERS_PATH) {
+      env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH;
+    } else {
+      console.log("• NixOS detected — using nixpkgs playwright-driver browsers");
+      env.PLAYWRIGHT_BROWSERS_PATH = await buildPlaywrightBrowsers();
+      env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+      env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+    }
+  } else {
+    env.PLAYWRIGHT_BROWSERS_PATH =
+      process.env.PLAYWRIGHT_BROWSERS_PATH ?? `${paths.root}/playwright-browsers`;
   }
 
   return env;
@@ -95,7 +97,7 @@ export async function teardown(): Promise<void> {
   }
 
   console.log(`• removing sandbox: ${paths.root}`);
-  // Everything (home, .claude, playwright-browsers, the nix deps cache) lives
+  // Everything (home, .claude, playwright-browsers, the nix browsers-path cache) lives
   // under root, so a single recursive remove clears the sandbox entirely.
   await rm(paths.root, { recursive: true, force: true });
   console.log("• teardown complete");

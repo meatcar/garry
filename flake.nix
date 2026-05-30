@@ -3,10 +3,12 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pinned so playwright-driver matches gstack's Playwright version (see src/nixos.ts).
+    nixpkgs-playwright.url = "github:NixOS/nixpkgs/7f6a6fb1c76e09426d6125e7e2543efe2a7f74e3";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, nixpkgs-playwright, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -24,7 +26,9 @@
         packages.default = pkgs.writeShellApplication {
           name = "garry";
           runtimeInputs = [ pkgs.bun ];
+          # Hand src/nixos.ts the pinned nixpkgs so it builds the matching Chromium.
           text = ''
+            export GARRY_PLAYWRIGHT_NIXPKGS=${nixpkgs-playwright}
             exec bun "${garry-src}/src/cli.ts" "$@"
           '';
         };
