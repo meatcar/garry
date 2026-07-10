@@ -22,7 +22,8 @@ Everything garry-specific lives under "garry gstack":
 To update gstack, run /gstack-upgrade inside a session, or re-run "garry gstack".
 
 Environment:
-  GARRY_SANDBOX_DIR   override the sandbox root directory
+  GARRY_SANDBOX_DIR         override the sandbox root directory
+  GARRY_DISABLE_TELEMETRY   1 = opt claude + gstack out of telemetry in the sandbox
 `;
 
 if (args[0] === "gstack") {

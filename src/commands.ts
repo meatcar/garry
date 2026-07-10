@@ -17,6 +17,19 @@ function inheritedEnv(): Record<string, string> {
   return out;
 }
 
+// GARRY_DISABLE_TELEMETRY=1 opts the whole sandboxed stack out of phone-home:
+// claude's statsig/sentry/updater traffic and gstack's usage telemetry. garry
+// itself sends nothing either way.
+export function telemetryEnv(optOut: string | undefined): Record<string, string> {
+  if (!optOut || optOut === "0") {
+    return {};
+  }
+  return {
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    GSTACK_TELEMETRY_OFF: "1",
+  };
+}
+
 async function buildSandboxEnv(): Promise<Record<string, string>> {
   const override = process.env.PLAYWRIGHT_BROWSERS_PATH;
   let nixBrowsers: string | undefined;
@@ -29,6 +42,7 @@ async function buildSandboxEnv(): Promise<Record<string, string>> {
     ...inheritedEnv(),
     HOME: paths.home,
     ...playwrightEnv(nixBrowsers, override, `${paths.root}/playwright-browsers`),
+    ...telemetryEnv(process.env.GARRY_DISABLE_TELEMETRY),
   };
 }
 

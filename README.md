@@ -102,6 +102,7 @@ On each launch, credentials are synced from your real `~/.claude` so you stay au
 |---|---|---|
 | `GARRY_SANDBOX_DIR` | `~/Library/Application Support/garry` (macOS), `~/.local/share/garry` (Linux) | Override the sandbox root |
 | `XDG_DATA_HOME` | unset | If set, the sandbox root is `$XDG_DATA_HOME/garry` on all platforms |
+| `GARRY_DISABLE_TELEMETRY` | unset | Set to `1` to opt the sandboxed stack out of phone-home: claude's statsig/sentry/updater traffic and gstack's usage telemetry. garry itself sends nothing either way |
 
 ## NixOS
 
