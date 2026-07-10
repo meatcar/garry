@@ -52,11 +52,18 @@ export async function gstack(passthrough: string[]): Promise<void> {
 
   await mkdir(paths.skills, { recursive: true });
 
-  if (existsSync(`${paths.gstack}/.git`)) {
+  // .git can survive as an empty husk (e.g. tmpfiles aging deletes files but
+  // not dirs), so probe HEAD rather than the dir itself.
+  if (existsSync(`${paths.gstack}/.git/HEAD`)) {
     console.log("• gstack already cloned — pulling latest");
     await $`git -C ${paths.gstack} pull --ff-only`;
   } else {
-    console.log("• cloning gstack");
+    if (existsSync(paths.gstack)) {
+      console.log("• gstack clone is broken — removing and re-cloning");
+      await rm(paths.gstack, { recursive: true, force: true });
+    } else {
+      console.log("• cloning gstack");
+    }
     await $`git clone --single-branch --depth 1 ${GSTACK_REPO} ${paths.gstack}`;
   }
 
@@ -106,7 +113,7 @@ export async function teardown(): Promise<void> {
 export async function status(): Promise<void> {
   console.log(`sandbox root:  ${paths.root}`);
 
-  if (existsSync(`${paths.gstack}/.git`)) {
+  if (existsSync(`${paths.gstack}/.git/HEAD`)) {
     const rev = await $`git -C ${paths.gstack} log -1 --format='%h %s'`.text();
     console.log(`gstack:        installed (${rev.trim()})`);
   } else {
