@@ -24,6 +24,11 @@ const CONFIG_DIRS = ["statsig", "projects"];
 
 const HOME_CONFIG_FILES = [".claude.json"];
 
+// gstack skills shell out to codex, which reads $HOME/.codex — refresh auth every
+// run (like the claude credentials), seed config once so sandbox edits stick.
+const CODEX_CREDENTIAL_FILES = ["auth.json"];
+const CODEX_CONFIG_FILES = ["config.toml"];
+
 function safeRealpath(path: string): string | undefined {
   try {
     return realpathSync(path);
@@ -111,4 +116,22 @@ export async function syncConfig(): Promise<void> {
     (dir) => existsSync(join(src, dir)) && !existsSync(join(dst, dir)),
   ).map(async (dir) => cp(join(src, dir), join(dst, dir), { recursive: true }));
   await Promise.all(dirOps);
+
+  const realCodex = join(realHome, ".codex");
+  const sandboxCodex = join(paths.home, ".codex");
+  const codexCredOps = CODEX_CREDENTIAL_FILES.filter((file) =>
+    existsSync(join(realCodex, file)),
+  ).map(async (file) => {
+    await mkdir(sandboxCodex, { recursive: true });
+    await copyFile(join(realCodex, file), join(sandboxCodex, file));
+  });
+  await Promise.all(codexCredOps);
+
+  const codexConfigOps = CODEX_CONFIG_FILES.filter(
+    (file) => existsSync(join(realCodex, file)) && !existsSync(join(sandboxCodex, file)),
+  ).map(async (file) => {
+    await mkdir(sandboxCodex, { recursive: true });
+    await copyFile(join(realCodex, file), join(sandboxCodex, file));
+  });
+  await Promise.all(codexConfigOps);
 }
