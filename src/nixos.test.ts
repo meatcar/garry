@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { playwrightEnv } from "./nixos.ts";
+import { browsersExpr, parseBrowsersCache, playwrightEnv } from "./nixos.ts";
 
 describe("playwrightEnv", () => {
   const browsers = "/nix/store/abc-playwright-browsers";
@@ -30,5 +30,29 @@ describe("playwrightEnv", () => {
     expect(playwrightEnv(browsers, "/custom/path", fallback)).toEqual({
       PLAYWRIGHT_BROWSERS_PATH: "/custom/path",
     });
+  });
+});
+
+describe("browsersExpr", () => {
+  test("includes the headless shell playwright needs for default headless launches", () => {
+    expect(browsersExpr("/nix/store/x-nixpkgs")).toContain("withChromiumHeadlessShell = true");
+  });
+});
+
+describe("parseBrowsersCache", () => {
+  const expr = browsersExpr("/nix/store/x-nixpkgs");
+  const path = "/nix/store/y-playwright-browsers";
+
+  test("round-trips a matching expression", () => {
+    expect(parseBrowsersCache(`${expr}\n${path}\n`, expr)).toBe(path);
+  });
+
+  test("rejects a cache built from a different expression", () => {
+    const other = browsersExpr("/nix/store/z-nixpkgs");
+    expect(parseBrowsersCache(`${other}\n${path}\n`, expr)).toBeUndefined();
+  });
+
+  test("rejects the legacy path-only cache format", () => {
+    expect(parseBrowsersCache(`${path}\n`, expr)).toBeUndefined();
   });
 });

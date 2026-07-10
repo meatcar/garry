@@ -67,9 +67,15 @@ jobs:
         if: steps.changes.outputs.flake == 'true' || github.event_name != 'pull_request'
         run: |
           rev=$(grep -oP 'nixpkgs-playwright\.url = "github:NixOS/nixpkgs/\K[0-9a-f]{40}' flake.nix)
-          out=$(nix build --no-link --print-out-paths "github:NixOS/nixpkgs/$rev#playwright-driver.browsers-chromium")
+          # Same bundle expression as browsersExpr in src/nixos.ts — keep in sync.
+          out=$(nix build --no-link --print-out-paths --impure --expr \
+            "(import (builtins.getFlake \"github:NixOS/nixpkgs/$rev\") { }).playwright-driver.browsers-chromium.override { withChromiumHeadlessShell = true; }")
           echo "browsers bundle: $out"
-          # -L: the bundle symlinks each browser dir to its own store path
-          chrome=$(find -L "$out/" -type f \( -name chrome -o -name headless_shell \) | head -1)
-          [ -n "$chrome" ] || { echo "no chromium binary found in bundle"; exit 1; }
-          "$chrome" --version
+          # -L: the bundle symlinks each browser dir to its own store path.
+          # Both binaries must exist: playwright's default headless launch uses
+          # the headless shell, headed launches use chrome.
+          for name in chrome chrome-headless-shell; do
+            bin=$(find -L "$out/" -type f -name "$name" | head -1)
+            [ -n "$bin" ] || { echo "no $name binary found in bundle"; exit 1; }
+            "$bin" --version
+          done

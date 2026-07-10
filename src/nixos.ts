@@ -50,33 +50,48 @@ export function playwrightEnv(
 
 let browsersPathCache: string | undefined;
 
-// gstack drives a headless Chromium daemon, so the chromium-only bundle suffices.
+// gstack drives a headless Chromium daemon, so the chromium-only bundle suffices —
+// but browsers-chromium ships without the headless shell, which playwright's default
+// headless launch requires, so flip it back on.
+export function browsersExpr(nixpkgs: string): string {
+  return `(import ${nixpkgs} { }).playwright-driver.browsers-chromium.override { withChromiumHeadlessShell = true; }`;
+}
+
 export async function buildPlaywrightBrowsers(): Promise<string> {
   if (browsersPathCache) {
     return browsersPathCache;
   }
 
-  const cached = readCachedBrowsersPath();
+  const expr = browsersExpr(nixpkgsPath());
+  const cached = readCachedBrowsersPath(expr);
   if (cached) {
     return (browsersPathCache = cached);
   }
 
-  const expr = `(import ${nixpkgsPath()} { }).playwright-driver.browsers-chromium`;
   const result = await $`nix-build --no-out-link -E ${expr}`.quiet();
   const path = result.stdout.toString().trim().split("\n").pop() ?? "";
   if (!path.startsWith("/nix/store/")) {
     throw new Error(`nix-build did not return a store path: ${path}`);
   }
-  cacheBrowsersPath(path);
+  cacheBrowsersPath(expr, path);
   return (browsersPathCache = path);
 }
 
-// Cache the store path in-process and on disk; a stale entry (rev bumped, path
-// GC'd) fails the existsSync check and falls back to a fresh nix-build.
-function readCachedBrowsersPath(): string | undefined {
+// Cache format: the expression that produced the path, then the path. Keying on
+// the expression invalidates the cache when the pin OR the bundle expression
+// changes — the old store path can outlive both, so existsSync alone is not enough.
+export function parseBrowsersCache(text: string, expr: string): string | undefined {
+  const [cachedExpr, path] = text.split("\n");
+  if (cachedExpr === expr && path?.startsWith("/nix/store/")) {
+    return path;
+  }
+  return undefined;
+}
+
+function readCachedBrowsersPath(expr: string): string | undefined {
   try {
-    const path = readFileSync(BROWSERS_CACHE, "utf8").trim();
-    if (path.startsWith("/nix/store/") && existsSync(path)) {
+    const path = parseBrowsersCache(readFileSync(BROWSERS_CACHE, "utf8"), expr);
+    if (path && existsSync(path)) {
       return path;
     }
   } catch {
@@ -85,9 +100,9 @@ function readCachedBrowsersPath(): string | undefined {
   return undefined;
 }
 
-function cacheBrowsersPath(path: string): void {
+function cacheBrowsersPath(expr: string, path: string): void {
   try {
-    writeFileSync(BROWSERS_CACHE, `${path}\n`);
+    writeFileSync(BROWSERS_CACHE, `${expr}\n${path}\n`);
   } catch {
     // Best effort.
   }
