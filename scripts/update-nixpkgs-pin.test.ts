@@ -52,8 +52,8 @@ const SAMPLE_FLAKE = `{
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # gstack-playwright-version: 1.58.2
-    # Pinned so playwright-driver matches gstack's Playwright version. Renovate
-    # bumps the marker above; \`bun run update-pin\` resolves the matching rev.
+    # Pinned so playwright-driver matches gstack's Playwright version. The
+    # update-pin workflow keeps marker + rev + lock in sync.
     nixpkgs-playwright.url = "github:NixOS/nixpkgs/7f6a6fb1c76e09426d6125e7e2543efe2a7f74e3";
   };
 }`;
@@ -75,7 +75,7 @@ describe("readFlakePin / applyFlakePin", () => {
     expect(readFlakePin(updated)).toEqual(next);
     // Only the pin lines change; the plain nixpkgs input is untouched.
     expect(updated).toContain('nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable"');
-    expect(updated).toContain("resolves the matching rev");
+    expect(updated).toContain("keeps marker + rev + lock in sync");
   });
 
   test("the real flake.nix carries a parseable pin", async () => {

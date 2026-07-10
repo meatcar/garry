@@ -1,0 +1,58 @@
+name: Update Playwright pin
+
+# Keeps the nixpkgs-playwright flake input matched to gstack's Playwright
+# version. Runs `bun run update-pin` and, if anything changed, opens a complete
+# PR (marker + rev + flake.lock in one commit) with auto-merge enabled — CI is
+# what gates the merge.
+on:
+  schedule:
+    - cron: "17 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Update pin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run update-pin
+
+      - name: Open auto-merging PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            echo "pin already up to date"
+            exit 0
+          fi
+          version=$(grep -oP 'gstack-playwright-version:\s*\K[0-9.]+' flake.nix)
+          branch="update-pin/playwright"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "chore: bump nixpkgs-playwright pin to playwright $version"
+          git push -f origin "$branch"
+          gh pr create --head "$branch" \
+            --title "chore: bump nixpkgs-playwright pin to playwright $version" \
+            --body "gstack now declares Playwright $version; repin nixpkgs-playwright to match. Opened by the update-pin workflow." \
+            || echo "PR already open — reusing it"
+          # Pushes made with the default GITHUB_TOKEN don't fire pull_request
+          # events, so kick CI explicitly; its checks satisfy branch protection.
+          gh workflow run ci.yml --ref "$branch"
+          gh pr merge --auto --squash "$branch"

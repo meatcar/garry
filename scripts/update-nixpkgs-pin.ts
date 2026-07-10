@@ -3,14 +3,13 @@
 // gstack uses. Browser revisions are tied to the Playwright version, so when
 // gstack bumps Playwright the pinned nixpkgs revision must follow.
 //
-// Renovate watches gstack's package.json (see renovate.json) and opens a PR
-// bumping the `gstack-playwright-version` marker in flake.nix; run this to
-// resolve the matching nixpkgs rev and refresh flake.lock:
+// The update-pin workflow (.github/workflows/update-pin.yml) runs this on a
+// schedule and opens an auto-merging PR when the pin drifts. By hand:
 //   bun run scripts/update-nixpkgs-pin.ts            # match gstack's package.json
 //   bun run scripts/update-nixpkgs-pin.ts 1.58.2     # force a specific version
 //
-// It reads gstack's package.json (not bun.lock) so it stays consistent with
-// Renovate's datasource — bun.lock is JSONC and Renovate can't parse it.
+// It reads gstack's package.json (not bun.lock) since the declared range is
+// what gstack's own setup installs against — bun.lock is JSONC anyway.
 //
 // Requires Nix on PATH (for `nix flake update`). Set GITHUB_TOKEN to avoid
 // GitHub API rate limits.
@@ -153,8 +152,8 @@ async function main(): Promise<void> {
 
   const pin: Pin = { rev, playwrightVersion: version };
 
-  // Renovate bumps only the version marker, and a hand-edited flake.nix can
-  // leave flake.lock stale — so check all three before declaring done.
+  // A hand-edited flake.nix can leave the marker or flake.lock stale — so
+  // check all three before declaring done.
   const lockRev = lockedRev(readFileSync(FLAKE_LOCK, "utf8"));
   if (current.rev === rev && current.playwrightVersion === version && lockRev === rev) {
     console.log(`• pin already correct for ${version} (rev ${rev.slice(0, 12)}) — up to date`);

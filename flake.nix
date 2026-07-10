@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # gstack-playwright-version: 1.58.2
     # Pinned so playwright-driver matches gstack's Playwright version (see src/nixos.ts).
-    # Renovate bumps the marker above; `bun run update-pin` resolves the matching rev.
+    # The update-pin workflow (or `bun run update-pin`) keeps marker + rev + lock in sync.
     nixpkgs-playwright.url = "github:NixOS/nixpkgs/7f6a6fb1c76e09426d6125e7e2543efe2a7f74e3";
     flake-utils.url = "github:numtide/flake-utils";
   };

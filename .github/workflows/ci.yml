@@ -1,0 +1,75 @@
+name: CI
+
+# workflow_dispatch matters: the update-pin workflow pushes with the default
+# GITHUB_TOKEN, which never triggers pull_request events, so it dispatches this
+# workflow on its branch instead. Check runs land on the head SHA either way,
+# which is all branch protection looks at.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run check
+
+      - run: bun test
+
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      # The strong pin check: the pinned rev must actually ship playwright-driver
+      # at the version the flake.nix marker claims. Fails on Renovate-style
+      # marker-only bumps until `bun run update-pin` completes them.
+      - name: Verify nixpkgs-playwright pin matches its marker
+        run: |
+          marker=$(grep -oP 'gstack-playwright-version:\s*\K[0-9.]+' flake.nix)
+          rev=$(grep -oP 'nixpkgs-playwright\.url = "github:NixOS/nixpkgs/\K[0-9a-f]{40}' flake.nix)
+          locked=$(nix eval --raw --impure --expr '(builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs-playwright.locked.rev')
+          echo "marker=$marker rev=$rev locked=$locked"
+          [ "$rev" = "$locked" ] || { echo "flake.lock is stale — run 'bun run update-pin'"; exit 1; }
+          driver=$(nix eval --raw "github:NixOS/nixpkgs/$rev#playwright-driver.version")
+          echo "driver=$driver"
+          [ "$driver" = "$marker" ] || { echo "pinned rev ships playwright-driver $driver, marker says $marker — run 'bun run update-pin'"; exit 1; }
+
+      - name: Build garry package
+        run: nix build .#
+
+      # Heavy (downloads the chromium bundle from cache.nixos.org), so step-gated
+      # to flake changes rather than job-gated — a skipped required *job* would
+      # still satisfy branch protection, but this keeps the check honest and fast
+      # for devDependency PRs.
+      - name: Detect flake changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            flake:
+              - 'flake.nix'
+              - 'flake.lock'
+
+      - name: Smoke-test the pinned chromium bundle
+        if: steps.changes.outputs.flake == 'true' || github.event_name != 'pull_request'
+        run: |
+          rev=$(grep -oP 'nixpkgs-playwright\.url = "github:NixOS/nixpkgs/\K[0-9a-f]{40}' flake.nix)
+          out=$(nix build --no-link --print-out-paths "github:NixOS/nixpkgs/$rev#playwright-driver.browsers-chromium")
+          echo "browsers bundle: $out"
+          # -L: the bundle symlinks each browser dir to its own store path
+          chrome=$(find -L "$out/" -type f \( -name chrome -o -name headless_shell \) | head -1)
+          [ -n "$chrome" ] || { echo "no chromium binary found in bundle"; exit 1; }
+          "$chrome" --version
