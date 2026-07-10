@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "nix": {
+    "enabled": false,
+    "description": "flake.lock updates would silently unpin nixpkgs-playwright; the pin is managed by scripts/update-nixpkgs-pin.ts"
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track gstack's Playwright version via the marker comment in flake.nix",
+      "managerFilePatterns": ["flake.nix"],
+      "matchStrings": ["gstack-playwright-version:\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "playwright",
+      "datasourceTemplate": "custom.gstack-playwright"
+    }
+  ],
+  "customDatasources": {
+    "gstack-playwright": {
+      "description": "The Playwright version declared in gstack's package.json (range operator stripped)",
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/garrytan/gstack/main/package.json",
+      "format": "json",
+      "transformTemplates": [
+        "{ \"releases\": [ { \"version\": $replace(dependencies.playwright, /[^0-9.]/, \"\") } ] }"
+      ]
+    }
+  },
+  "packageRules": [
+    {
+      "description": "gstack Playwright bumps: run `bun run update-pin` on the PR branch to resolve the matching nixpkgs rev + flake.lock",
+      "matchDatasources": ["custom.gstack-playwright"],
+      "commitMessageTopic": "gstack Playwright pin",
+      "addLabels": ["nixpkgs-pin"]
+    }
+  ]
+}
