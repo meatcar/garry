@@ -43,18 +43,30 @@ function pickRoot(): string {
 
   const { uid } = userInfo();
   const [defaultRoot, ...fallbacks] = [
-    join(xdgData, "garry-sandbox"),
-    join(homedir(), ".garry-sandbox"),
-    `/var/tmp/garry-sandbox-${uid}`,
-    `/tmp/garry-sandbox-${uid}`,
+    join(xdgData, "garry"),
+    join(homedir(), ".garry"),
+    `/var/tmp/garry-${uid}`,
+    `/tmp/garry-${uid}`,
   ];
 
   for (const candidate of [defaultRoot, ...fallbacks]) {
     if (candidate && isExecutable(candidate)) {
+      if (candidate !== defaultRoot) {
+        // Silent degradation here cost us a debugging session: noexec mounts
+        // push the sandbox into /tmp, where tmpfiles aging eats idle clones.
+        console.warn(
+          `• ${defaultRoot} not usable (noexec mount?) — sandbox at ${candidate}`,
+        );
+        if (candidate.startsWith("/tmp/")) {
+          console.warn(
+            "  /tmp is subject to periodic cleanup; set GARRY_SANDBOX_DIR to a persistent exec-capable dir to avoid re-setup",
+          );
+        }
+      }
       return candidate;
     }
   }
-  return defaultRoot ?? `/tmp/garry-sandbox-${uid}`;
+  return defaultRoot ?? `/tmp/garry-${uid}`;
 }
 
 const root = pickRoot();

@@ -88,7 +88,7 @@ gstack updates itself from inside a session — just run `/gstack-upgrade` in cl
 
 ## How it works
 
-garry creates a sandbox directory (default: `~/Library/Application Support/garry-sandbox` on macOS, `~/.local/share/garry-sandbox` on Linux) containing an isolated `HOME`. Inside it:
+garry creates a sandbox directory (default: `~/Library/Application Support/garry` on macOS, `~/.local/share/garry` on Linux) containing an isolated `HOME`. Inside it:
 
 - A fresh `~/.claude` directory is created — gstack installs here, not in your real `~/.claude`
 - Your credentials and settings are copied in at runtime so claude can authenticate
@@ -100,8 +100,8 @@ On each launch, credentials are synced from your real `~/.claude` so you stay au
 
 | Variable | Default | Description |
 |---|---|---|
-| `GARRY_SANDBOX_DIR` | `~/Library/Application Support/garry-sandbox` (macOS), `~/.local/share/garry-sandbox` (Linux) | Override the sandbox root |
-| `XDG_DATA_HOME` | unset | If set, the sandbox root is `$XDG_DATA_HOME/garry-sandbox` on all platforms |
+| `GARRY_SANDBOX_DIR` | `~/Library/Application Support/garry` (macOS), `~/.local/share/garry` (Linux) | Override the sandbox root |
+| `XDG_DATA_HOME` | unset | If set, the sandbox root is `$XDG_DATA_HOME/garry` on all platforms |
 
 ## NixOS
 
