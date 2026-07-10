@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 
 import { $ } from "bun";
 
-import { buildPlaywrightBrowsers, isNixOS } from "./nixos.ts";
+import { buildPlaywrightBrowsers, isNixOS, playwrightEnv } from "./nixos.ts";
 import { GSTACK_REPO, paths } from "./paths.ts";
 import { assertIsolation, ensureSandbox, syncConfig } from "./sandbox.ts";
 
@@ -18,28 +18,18 @@ function inheritedEnv(): Record<string, string> {
 }
 
 async function buildSandboxEnv(): Promise<Record<string, string>> {
-  const env: Record<string, string> = {
-    ...inheritedEnv(),
-    HOME: paths.home,
-  };
-
-  if (isNixOS()) {
-    // Playwright's prebuilt Chromium can't run against NixOS' non-FHS libraries,
-    // so use the Chromium nixpkgs builds for NixOS instead of downloading + lib-shimming.
-    if (process.env.PLAYWRIGHT_BROWSERS_PATH) {
-      env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH;
-    } else {
-      console.log("• NixOS detected — using nixpkgs playwright-driver browsers");
-      env.PLAYWRIGHT_BROWSERS_PATH = await buildPlaywrightBrowsers();
-      env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
-      env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
-    }
-  } else {
-    env.PLAYWRIGHT_BROWSERS_PATH =
-      process.env.PLAYWRIGHT_BROWSERS_PATH ?? `${paths.root}/playwright-browsers`;
+  const override = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  let nixBrowsers: string | undefined;
+  if (isNixOS() && !override) {
+    console.log("• NixOS detected — using nixpkgs playwright-driver browsers");
+    nixBrowsers = await buildPlaywrightBrowsers();
   }
 
-  return env;
+  return {
+    ...inheritedEnv(),
+    HOME: paths.home,
+    ...playwrightEnv(nixBrowsers, override, `${paths.root}/playwright-browsers`),
+  };
 }
 
 // Install or refresh gstack inside the sandbox. Clones on first run, pulls

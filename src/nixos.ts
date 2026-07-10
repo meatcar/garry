@@ -27,6 +27,27 @@ function nixpkgsPath(): string {
   return path;
 }
 
+// Playwright's prebuilt Chromium can't run against NixOS' non-FHS libraries, so
+// on NixOS (nixBrowsers set) point Playwright at the nixpkgs bundle and skip the
+// download + host validation. An explicit override wins on every platform.
+export function playwrightEnv(
+  nixBrowsers: string | undefined,
+  override: string | undefined,
+  fallback: string,
+): Record<string, string> {
+  if (override) {
+    return { PLAYWRIGHT_BROWSERS_PATH: override };
+  }
+  if (nixBrowsers) {
+    return {
+      PLAYWRIGHT_BROWSERS_PATH: nixBrowsers,
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1",
+      PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS: "true",
+    };
+  }
+  return { PLAYWRIGHT_BROWSERS_PATH: fallback };
+}
+
 let browsersPathCache: string | undefined;
 
 // gstack drives a headless Chromium daemon, so the chromium-only bundle suffices.
