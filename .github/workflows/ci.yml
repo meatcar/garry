@@ -55,7 +55,7 @@ jobs:
       # still satisfy branch protection, but this keeps the check honest and fast
       # for devDependency PRs.
       - name: Detect flake changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: |
