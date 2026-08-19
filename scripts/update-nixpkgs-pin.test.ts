@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import {
   type Pin,
   applyFlakePin,
   compareSemver,
+  findNixpkgsRev,
   lockedRev,
   parseDriverVersion,
   parseGstackPlaywrightVersion,
@@ -45,6 +46,62 @@ describe("compareSemver", () => {
     expect(compareSemver("1.59.1", "1.58.2")).toBeGreaterThan(0);
     expect(compareSemver("1.9.0", "1.10.0")).toBeLessThan(0); // lexical would be wrong
     expect(compareSemver("1.58.2", "1.58.2")).toBe(0);
+  });
+});
+
+describe("findNixpkgsRev", () => {
+  const realFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  type HistoryEntry = string | { body: string; status?: number };
+
+  function mockNixpkgsHistory(entries: HistoryEntry[]): void {
+    globalThis.fetch = Object.assign(
+      mock(async (input: string | URL | Request) => {
+        const url = input.toString();
+        if (url.includes("api.github.com")) {
+          return Response.json(entries.map((_, index) => ({ sha: `rev-${index}` })));
+        }
+        const rev = url.match(/\/rev-(\d+)\//)?.[1];
+        if (rev === undefined) {
+          throw new Error(`unexpected URL: ${url}`);
+        }
+        const entry = entries[Number(rev)];
+        if (typeof entry === "string") {
+          return new Response(`{ version = "${entry}"; }`);
+        }
+        return new Response(entry?.body, { status: entry?.status });
+      }),
+      { preconnect: realFetch.preconnect },
+    );
+  }
+
+  test("returns no revision while nixpkgs is still behind", async () => {
+    mockNixpkgsHistory(["1.61.1"]);
+    expect(await findNixpkgsRev("1.62.1")).toBeUndefined();
+  });
+
+  test("finds the exact version in newer-first history", async () => {
+    mockNixpkgsHistory(["1.63.0", "1.62.1"]);
+    expect(await findNixpkgsRev("1.62.1")).toBe("rev-1");
+  });
+
+  test("fails when nixpkgs advanced past the requested version", async () => {
+    mockNixpkgsHistory(["1.63.0", "1.61.1"]);
+    await expect(findNixpkgsRev("1.62.1")).rejects.toThrow("history crossed");
+  });
+
+  test("fails when a driver file request fails", async () => {
+    mockNixpkgsHistory([{ body: "server error", status: 500 }, "1.61.1"]);
+    await expect(findNixpkgsRev("1.62.1")).rejects.toThrow("GitHub request failed (500)");
+  });
+
+  test("fails when a driver version cannot be parsed", async () => {
+    mockNixpkgsHistory([{ body: '{ pname = "playwright-driver"; }' }, "1.61.1"]);
+    await expect(findNixpkgsRev("1.62.1")).rejects.toThrow("could not parse");
   });
 });
 

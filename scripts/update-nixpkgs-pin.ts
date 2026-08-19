@@ -102,10 +102,12 @@ async function gh(url: string): Promise<Response> {
 
 // Find the newest nixpkgs commit whose playwright driver.nix is exactly
 // `version`. driver.nix version is monotonic along the branch, so we scan
-// commits newest-first and stop at the first exact match (or bail once we drop
-// below the target — meaning that version was never in nixpkgs).
-async function findNixpkgsRev(version: string): Promise<string> {
+// commits newest-first and stop at the first exact match. If the newest version
+// is below the target, the scheduled updater has no work yet and will retry. If
+// history crosses from above to below, nixpkgs skipped the target and we fail.
+export async function findNixpkgsRev(version: string): Promise<string | undefined> {
   const perPage = 100;
+  let sawNewerVersion = false;
   for (let page = 1; page <= 6; page++) {
     const commits = (await (
       await gh(
@@ -116,22 +118,30 @@ async function findNixpkgsRev(version: string): Promise<string> {
       break;
     }
     for (const { sha } of commits) {
-      const driver = await (
-        await fetch(`https://raw.githubusercontent.com/NixOS/nixpkgs/${sha}/${DRIVER_NIX_PATH}`)
-      ).text();
+      const driverUrl = `https://raw.githubusercontent.com/NixOS/nixpkgs/${sha}/${DRIVER_NIX_PATH}`;
+      const response = await fetch(driverUrl);
+      if (!response.ok) {
+        throw new Error(`GitHub request failed (${response.status}): ${driverUrl}`);
+      }
+      const driver = await response.text();
       const found = parseDriverVersion(driver);
       if (!found) {
-        continue;
+        throw new Error(`could not parse playwright-driver version at ${sha}`);
       }
       if (found === version) {
         return sha;
       }
-      if (compareSemver(found, version) < 0) {
+      if (compareSemver(found, version) > 0) {
+        sawNewerVersion = true;
+        continue;
+      }
+      if (sawNewerVersion) {
         throw new Error(
           `no nixpkgs commit found with playwright-driver ${version} ` +
-            `(history dropped to ${found}); it may not be in nixpkgs yet`,
+            `(history crossed from a newer version to ${found})`,
         );
       }
+      return undefined;
     }
   }
   throw new Error(`no nixpkgs commit found with playwright-driver ${version} in recent history`);
@@ -148,6 +158,10 @@ async function main(): Promise<void> {
 
   console.log(`• searching nixpkgs for playwright-driver ${version}…`);
   const rev = await findNixpkgsRev(version);
+  if (!rev) {
+    console.log(`• playwright-driver ${version} is not in nixpkgs yet — keeping current pin`);
+    return;
+  }
   console.log(`• found nixpkgs rev ${rev}`);
 
   const pin: Pin = { rev, playwrightVersion: version };
