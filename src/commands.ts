@@ -91,7 +91,7 @@ export async function run(passthrough: string[]): Promise<void> {
   await syncConfig();
 
   const env = await buildSandboxEnv();
-  console.log("• launching claude with gstack (sandboxed)");
+  console.log("• launching claude with gstack in its separate home");
   const proc = Bun.spawn(["claude", ...passthrough], {
     env,
     stdin: "inherit",

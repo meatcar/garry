@@ -1,5 +1,5 @@
 {
-  description = "Run gstack (garrytan/gstack) in full isolation from your local Claude Code config";
+  description = "Run gstack (garrytan/gstack) with a separate home and Claude Code config";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

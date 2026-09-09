@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>garry browser smoke</title>
+  </head>
+  <body>
+    <h1 id="title">Browser E2E fixture</h1>
+    <label for="name">Name</label>
+    <input id="name" />
+    <button id="submit" type="button">Submit</button>
+    <p id="result" hidden></p>
+    <script>
+      document.querySelector("#submit").addEventListener("click", () => {
+        const name = document.querySelector("#name").value;
+        const result = document.querySelector("#result");
+        result.textContent = `submitted:${name}`;
+        result.hidden = false;
+        history.pushState({}, "", `/done?name=${encodeURIComponent(name)}`);
+      });
+    </script>
+  </body>
+</html>

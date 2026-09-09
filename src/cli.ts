@@ -3,9 +3,9 @@ import { gstack, run, status, teardown } from "./commands.ts";
 
 const args = process.argv.slice(2);
 
-const USAGE = `garry — run claude with gstack in an isolated sandbox
+const USAGE = `garry — run claude with gstack in a separate configuration home
 
-Garry is claude. Anything you pass is forwarded straight to claude, sandboxed:
+Garry is claude. Anything you pass is forwarded straight to claude in that home:
 
   garry                         launch claude (first run installs gstack)
   garry --resume                → claude --resume

@@ -1,0 +1,102 @@
+name: Latest gstack compatibility
+
+on:
+  pull_request:
+    paths:
+      - ".github/docker/upstream-compat.Dockerfile"
+      - ".github/workflows/upstream-compat.yml"
+      - "scripts/e2e/**"
+      - "src/cli.ts"
+      - "src/commands.ts"
+      - "src/nixos.ts"
+      - "src/paths.ts"
+      - "src/sandbox.ts"
+      - "tests/fixtures/browser-smoke.html"
+  schedule:
+    - cron: "47 7 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latest-gstack-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify checkout has no persisted credential
+        run: test -z "$(git config --local --get-regexp '^http\..*\.extraheader$' || true)"
+
+      - name: Build fixed test environment
+        run: |
+          docker build \
+            --file .github/docker/upstream-compat.Dockerfile \
+            --tag "garry-upstream-compat:$GITHUB_SHA" \
+            .github/docker
+
+      - name: Prepare writable results and read-only boundary probe
+        run: |
+          mkdir -p "$RUNNER_TEMP/upstream-results" "$RUNNER_TEMP/host-boundary"
+          chmod 0777 "$RUNNER_TEMP/upstream-results"
+          printf 'host boundary must remain unchanged\n' \
+            > "$RUNNER_TEMP/host-boundary/sentinel"
+          sha256sum "$RUNNER_TEMP/host-boundary/sentinel" \
+            > "$RUNNER_TEMP/host-boundary.sha256"
+
+      - name: Exercise latest gstack and Chromium
+        run: |
+          docker run --name garry-upstream-compat \
+            --init \
+            --user 1000:1000 \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 512 \
+            --shm-size 1g \
+            --tmpfs /work:rw,exec,nosuid,nodev,uid=1000,gid=1000,size=4g \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,uid=1000,gid=1000,size=1g \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/repo,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/host-boundary,dst=/host-boundary,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/upstream-results,dst=/results" \
+            --env HOME=/work/real-home \
+            --env GARRY_SANDBOX_DIR=/work/garry \
+            --env GARRY_DISABLE_TELEMETRY=1 \
+            --env GSTACK_SKIP_FONTS=1 \
+            --env CI=1 \
+            "garry-upstream-compat:$GITHUB_SHA" \
+            bash /repo/scripts/e2e/upstream-compat.sh
+
+      - name: Verify host mount boundary
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/host-boundary.sha256" ]]; then
+            sha256sum --check "$RUNNER_TEMP/host-boundary.sha256"
+          fi
+
+      - name: Report tested upstream revision
+        if: always()
+        run: |
+          if [[ -s "$RUNNER_TEMP/upstream-results/upstream-sha" ]]; then
+            sha=$(cat "$RUNNER_TEMP/upstream-results/upstream-sha")
+            if [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Tested [garrytan/gstack@$sha](https://github.com/garrytan/gstack/commit/$sha)." \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "gstack produced an invalid revision: \`$sha\`." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo "gstack failed before a revision could be recorded." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Remove test container
+        if: always()
+        run: docker rm --force garry-upstream-compat >/dev/null 2>&1 || true

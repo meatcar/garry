@@ -1,7 +1,7 @@
 {
   "name": "garry",
   "version": "0.1.0",
-  "description": "Run gstack (garrytan/gstack) in full isolation from your local Claude Code config",
+  "description": "Run gstack (garrytan/gstack) with a separate home and Claude Code config",
   "license": "MIT",
   "repository": {
     "type": "git",

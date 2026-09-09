@@ -1,10 +1,13 @@
 # garry
 
-Run [gstack](https://github.com/garrytan/gstack) in a fully isolated sandbox, untouched by your local Claude Code config.
+Run [gstack](https://github.com/garrytan/gstack) with a separate home and Claude Code configuration.
 
 ## Why
 
-gstack installs itself as a Claude Code skill and modifies your `~/.claude` directory. If you want to try it without disturbing your existing setup — or keep a clean, reproducible environment for gstack — garry sandboxes it in a separate `HOME`.
+gstack installs itself as a Claude Code skill and modifies your `~/.claude`
+directory. If you want to try it without replacing your existing setup — or
+keep a clean, reproducible environment for gstack — garry gives it a separate
+`HOME`.
 
 ## Requirements
 
@@ -58,7 +61,9 @@ bunx garry <command>
 
 ## Usage
 
-**garry is claude.** Whatever you pass is forwarded straight to `claude`, running in the sandbox — and the first run installs gstack for you automatically:
+**garry is claude.** Whatever you pass is forwarded straight to `claude`,
+running with the separate `HOME` — and the first run installs gstack for you
+automatically:
 
 ```sh
 garry                # launch claude (installs gstack on first run)
@@ -88,13 +93,23 @@ gstack updates itself from inside a session — just run `/gstack-upgrade` in cl
 
 ## How it works
 
-garry creates a sandbox directory (default: `~/Library/Application Support/garry` on macOS, `~/.local/share/garry` on Linux) containing an isolated `HOME`. Inside it:
+garry creates a directory (default: `~/Library/Application Support/garry` on
+macOS, `~/.local/share/garry` on Linux) containing a separate `HOME`. Inside it:
 
 - A fresh `~/.claude` directory is created — gstack installs here, not in your real `~/.claude`
 - Your credentials and settings are copied in at runtime so claude can authenticate
 - Tool caches (`.bun`, `.npm`, `.cache`, etc.) are symlinked from your real home to avoid redundant downloads
 
-On each launch, credentials are synced from your real `~/.claude` so you stay authenticated without sharing config.
+On each launch, credentials are synced from your real `~/.claude` so you stay
+authenticated without using that directory as Claude's runtime home.
+
+### Security model
+
+garry provides configuration separation, not an OS security boundary. gstack and
+Claude still run as your user with inherited environment variables and network
+access. Credentials are copied into garry's home, and selected cache and config
+directories are shared with your real home by symlink. Run only trusted upstream
+code; use a container or VM if you need containment from the processes you run.
 
 ## Configuration
 
@@ -109,6 +124,15 @@ On each launch, credentials are synced from your real `~/.claude` so you stay au
 On NixOS, garry skips Playwright's prebuilt Chromium (which can't run against NixOS' non-FHS libraries) and instead points Playwright at the Chromium that nixpkgs builds for NixOS, via `nix-build`. Playwright resolves browsers by a revision tied to its exact version, so garry pins a nixpkgs revision whose `playwright-driver` matches the Playwright version gstack installs — no per-launch Chromium download or library shimming required.
 
 The matching nixpkgs is pinned as the `nixpkgs-playwright` flake input in [`flake.nix`](flake.nix). If gstack bumps its Playwright version, run `bun run update-pin` (requires Nix): it finds the newest nixpkgs commit whose `playwright-driver` matches gstack's declared Playwright version, repoints the input, and refreshes `flake.lock`. The [`update-pin` workflow](.github/workflows/update-pin.yml) does this on a schedule and opens an auto-merging PR; [CI](.github/workflows/ci.yml) verifies the pinned rev really ships the marked driver version and smoke-tests the chromium bundle before the merge lands. Set `PLAYWRIGHT_BROWSERS_PATH` yourself to override the pinned browsers entirely.
+
+## Compatibility checks
+
+Normal CI includes a subprocess integration test for garry's configuration
+separation contract. On weekdays, the
+[`upstream-compat` workflow](.github/workflows/upstream-compat.yml) installs the
+latest gstack in a disposable, unprivileged Docker container and exercises real
+Chromium navigation, form interaction, and daemon shutdown against a local test
+page. The container is the security boundary for that test; garry itself is not.
 
 ## License
 
