@@ -3,10 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # gstack-playwright-version: 1.58.2
+    # gstack-playwright-version: 1.62.1
     # Pinned so playwright-driver matches gstack's Playwright version (see src/nixos.ts).
     # The update-pin workflow (or `bun run update-pin`) keeps marker + rev + lock in sync.
-    nixpkgs-playwright.url = "github:NixOS/nixpkgs/7f6a6fb1c76e09426d6125e7e2543efe2a7f74e3";
+    nixpkgs-playwright.url = "github:NixOS/nixpkgs/590d737e9e7cfbc6ee5c569a7683eaa67456a761";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
