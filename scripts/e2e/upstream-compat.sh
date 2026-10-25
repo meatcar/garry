@@ -24,6 +24,8 @@ if (exec 2>/dev/null; touch "$repo/.garry-write-probe"); then
   exit 1
 fi
 
+bun test "$repo/src/runtime.test.ts"
+
 bun "$repo/src/cli.ts" gstack \
   --no-prefix \
   --no-plan-tune-hooks \

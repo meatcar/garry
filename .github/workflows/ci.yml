@@ -50,6 +50,9 @@ jobs:
       - name: Build garry package
         run: nix build .#
 
+      - name: Verify patched Bun runtime
+        run: nix run .#bun -- test ./src/runtime.test.ts
+
       # Heavy (downloads the chromium bundle from cache.nixos.org), so step-gated
       # to flake changes rather than job-gated — a skipped required *job* would
       # still satisfy branch protection, but this keeps the check honest and fast

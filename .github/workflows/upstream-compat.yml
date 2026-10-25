@@ -10,6 +10,7 @@ on:
       - "src/commands.ts"
       - "src/nixos.ts"
       - "src/paths.ts"
+      - "src/runtime.test.ts"
       - "src/sandbox.ts"
       - "tests/fixtures/browser-smoke.html"
   schedule:

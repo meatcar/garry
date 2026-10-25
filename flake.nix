@@ -13,7 +13,10 @@
   outputs = { self, nixpkgs, nixpkgs-playwright, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ (import ./nix/overlays/bun-cve-2026-111497.nix) ];
+        };
         garry-src = pkgs.stdenv.mkDerivation {
           pname = "garry-src";
           version = "0.1.0";
@@ -25,6 +28,7 @@
           '';
         };
       in {
+        packages.bun = pkgs.bun;
         packages.default = pkgs.writeShellApplication {
           name = "garry";
           runtimeInputs = [ pkgs.bun ];
